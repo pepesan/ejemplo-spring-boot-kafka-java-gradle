@@ -1,0 +1,49 @@
+# Nombre de la aplicación — se usa como group-id del consumer de Kafka
+spring:
+  application:
+    name: ejemplo-spring-boot-kafka-java-gradle
+
+  kafka:
+    # ─── OBLIGATORIO (producer y consumer) ────────────────────────────────────
+    # Dirección del broker Kafka. Apunta al listener EXTERNAL del compose.yaml (puerto 9092 en localhost)
+    bootstrap-servers: localhost:9092
+
+    # ─── CONSUMER ─────────────────────────────────────────────────────────────
+    consumer:
+      # Identificador del grupo de consumers. Todos los consumers del mismo grupo se reparten las particiones
+      group-id: ${spring.application.name}
+
+      # Política de offset inicial: 'earliest' lee desde el principio del topic si no hay offset previo guardado.
+      # Usar 'latest' para leer solo mensajes nuevos a partir del arranque
+      auto-offset-reset: earliest
+
+      # Las claves de los mensajes llegan como String
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+      # Los valores llegan como JSON y se deserializan automáticamente a la clase indicada abajo
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        # Clase destino para deserializar el valor del mensaje. Debe coincidir con la clase del producer
+        spring.json.value.default.type: "com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.models.ProductMessage"
+
+    # ─── PRODUCER ─────────────────────────────────────────────────────────────
+    producer:
+      # Las claves se serializan como String
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      # Los valores se serializan a JSON automáticamente desde el objeto Java
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+    # ─── OBLIGATORIO (producer y consumer) cuando se usa JsonSerializer/Deserializer ──
+    properties:
+      # Paquetes de confianza para la deserialización JSON. Evita que se deserialicen clases arbitrarias
+      spring.json.trusted.packages: "com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.models"
+
+# ─── ACTUATOR ─────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        # Expone todos los endpoints del actuator: health, info, metrics, env, etc.
+        # En producción limitar a los necesarios: "health,info"
+        include: "*"
