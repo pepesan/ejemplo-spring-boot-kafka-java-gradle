@@ -31,6 +31,60 @@ These additional references should also help you:
 * [Gradle Build Scans – insights for your project's build](https://scans.gradle.com#gradle)
 
 
+### Tests
+
+#### Todas las pruebas a la vez
+
+```bash
+./gradlew test
+```
+
+#### Solo tests unitarios
+
+Los tests unitarios cubren producers, consumers y controllers de forma aislada (sin levantar Kafka ni el contexto completo de Spring).
+
+```bash
+./gradlew test --tests "*.producers.*" --tests "*.consumers.*" --tests "*.controllers.*"
+```
+
+#### Solo tests de aceptación
+
+Los tests de aceptación levantan el contexto completo de Spring Boot con un Kafka embebido y verifican el flujo end-to-end (REST → Kafka → Consumer → REST).
+
+```bash
+./gradlew test --tests "*.acceptance.*"
+```
+
+#### Una prueba específica
+
+Para ejecutar una clase de test concreta:
+
+```bash
+./gradlew test --tests "com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.producers.OrderProducerTest"
+```
+
+Para ejecutar un método de test concreto:
+
+```bash
+./gradlew test --tests "com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.producers.OrderProducerTest.send_delegatesToKafkaTemplate"
+```
+
+> También se puede usar el comodín `*` en el nombre del paquete o de la clase:
+> ```bash
+> ./gradlew test --tests "*OrderProducerTest*"
+> ```
+
+#### Estructura de los tests
+
+| Paquete                  | Tipo        | Descripción                                              |
+|--------------------------|-------------|----------------------------------------------------------|
+| `producers`              | Unitario    | Verifica que el producer delega en `KafkaTemplate`       |
+| `consumers`              | Unitario    | Verifica que el consumer almacena mensajes en memoria    |
+| `controllers`            | Unitario    | Verifica los endpoints REST con `@WebFluxTest` y mocks   |
+| `acceptance`             | Aceptación  | Flujo completo con Kafka embebido vía `@EmbeddedKafka`   |
+
+---
+
 ### Arranque de la aplicación
 ```shell
 ./gradlew bootRun
