@@ -35,6 +35,11 @@ spring:
       # Los valores se serializan a JSON automáticamente desde el objeto Java
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
+    # ─── STREAMS ──────────────────────────────────────────────────────────────────
+    streams:
+      # Identificador único de la aplicación Kafka Streams. Activa la auto-configuración de Spring Boot
+      application-id: ${spring.application.name}-streams
+
     # ─── OBLIGATORIO (producer y consumer) cuando se usa JsonSerializer/Deserializer ──
     properties:
       # Paquetes de confianza para la deserialización JSON. Evita que se deserialicen clases arbitrarias
