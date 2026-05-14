@@ -30,6 +30,36 @@ These additional references should also help you:
 
 * [Gradle Build Scans – insights for your project's build](https://scans.gradle.com#gradle)
 
+### Arranque de la aplicación
+```shell
+./gradlew bootRun
+```
+
+O en la config de Intellij -> Edit Configurations
+Run: **bootRun**
+
+Debería arrancar en el puerto 8080
+
+### URLs principales
+
+| Recurso          | URL                                    |
+|------------------|----------------------------------------|
+| Aplicación       | http://localhost:8080/                 |
+| Actuator (raíz)  | http://localhost:8080/actuator         |
+| Health           | http://localhost:8080/actuator/health  |
+| Info             | http://localhost:8080/actuator/info    |
+| Metrics          | http://localhost:8080/actuator/metrics |
+| Env              | http://localhost:8080/actuator/env     |
+| Kafka UI         | http://localhost:8081/                 |
+
+> Por defecto solo `health` e `info` están expuestos. Para exponer todos los endpoints añade en `application.yaml`:
+> ```yaml
+> management:
+>   endpoints:
+>     web:
+>       exposure:
+>         include: "*"
+> ```
 
 ### Tests
 
@@ -85,36 +115,7 @@ Para ejecutar un método de test concreto:
 
 ---
 
-### Arranque de la aplicación
-```shell
-./gradlew bootRun
-```
 
-O en la config de Intellij -> Edit Configurations
-Run: **bootRun**
-
-Debería arrancar en el puerto 8080
-
-### URLs principales
-
-| Recurso          | URL                                    |
-|------------------|----------------------------------------|
-| Aplicación       | http://localhost:8080/                 |
-| Actuator (raíz)  | http://localhost:8080/actuator         |
-| Health           | http://localhost:8080/actuator/health  |
-| Info             | http://localhost:8080/actuator/info    |
-| Metrics          | http://localhost:8080/actuator/metrics |
-| Env              | http://localhost:8080/actuator/env     |
-| Kafka UI         | http://localhost:8081/                 |
-
-> Por defecto solo `health` e `info` están expuestos. Para exponer todos los endpoints añade en `application.yaml`:
-> ```yaml
-> management:
->   endpoints:
->     web:
->       exposure:
->         include: "*"
-> ```
 
 ### Kafka
 
