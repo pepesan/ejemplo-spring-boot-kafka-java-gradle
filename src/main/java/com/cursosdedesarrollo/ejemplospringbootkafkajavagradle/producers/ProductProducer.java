@@ -16,7 +16,17 @@ public class ProductProducer {
     private final KafkaTemplate<String, ProductMessage> kafkaTemplate;
 
     public void send(ProductMessage product) {
-        log.info("Sending product: {}", product);
-        kafkaTemplate.send(TOPIC, product.getId(), product);
+        log.info("[PRODUCER] Enviando mensaje al topic '{}' | key={} | product={}", TOPIC, product.getId(), product);
+        kafkaTemplate.send(TOPIC, product.getId(), product)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("[PRODUCER] Error al enviar producto id={} | error={}", product.getId(), ex.getMessage());
+                    } else {
+                        log.info("[PRODUCER] Mensaje enviado correctamente | topic={} | partition={} | offset={}",
+                                result.getRecordMetadata().topic(),
+                                result.getRecordMetadata().partition(),
+                                result.getRecordMetadata().offset());
+                    }
+                });
     }
 }
