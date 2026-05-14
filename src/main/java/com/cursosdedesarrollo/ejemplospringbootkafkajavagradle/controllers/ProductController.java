@@ -12,7 +12,8 @@ import reactor.core.publisher.Mono;
 @RestController
 @RequestMapping("/products")
 @RequiredArgsConstructor
-public class ProductController {
+public class
+ProductController {
 
     private final ProductProducer productProducer;
 

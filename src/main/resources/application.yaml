@@ -24,7 +24,8 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         # Clase destino para deserializar el valor del mensaje. Debe coincidir con la clase del producer
-        spring.json.value.default.type: "com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.models.ProductMessage"
+        # Para múltiples tipos se usa el header __TypeId__ que Spring Kafka incluye automáticamente
+        spring.json.use.type.headers: true
 
     # ─── PRODUCER ─────────────────────────────────────────────────────────────
     producer:
