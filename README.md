@@ -275,16 +275,19 @@ curl -s http://localhost:8080/orders/consumed | jq .
 
 ## Kafka Streams — Flujo de pagos
 
-La topología de Kafka Streams procesa los mensajes del topic `payments` en tiempo real y realiza dos operaciones en paralelo:
+La topología de Kafka Streams procesa los mensajes del topic `payments` en tiempo real y realiza tres operaciones en paralelo:
 
 ```
 POST /payments
     → PaymentProducer → topic: payments
         → PaymentStreamsTopology (Kafka Streams)
             ├─ amount > 1000 → topic: payments-high-value
-            └─ agrupa por status → state store: payment-count-by-status
-                                        ↑
-                             GET /payments/count/{status}
+            ├─ agrupa por status → state store: payment-count-by-status
+            │                           ↑
+            │                GET /payments/count/{status}
+            └─ agrupa por status + ventana 1 min → state store: payment-count-by-status-window
+                                                        ↑
+                                         GET /payments/count/{status}/windowed
 ```
 
 ### Modelo `PaymentEvent`
@@ -299,17 +302,19 @@ POST /payments
 
 ### Endpoints REST
 
-| Método | URL                                          | Descripción                                            |
-|--------|----------------------------------------------|--------------------------------------------------------|
-| POST   | `http://localhost:8080/payments`             | Envía un pago al topic `payments`                      |
-| GET    | `http://localhost:8080/payments/count/{status}` | Consulta el contador de pagos por estado en el state store |
+| Método | URL                                                   | Descripción                                                        |
+|--------|-------------------------------------------------------|--------------------------------------------------------------------|
+| POST   | `http://localhost:8080/payments`                      | Envía un pago al topic `payments`                                  |
+| GET    | `http://localhost:8080/payments/count/{status}`       | Contador total de pagos por estado (state store global)            |
+| GET    | `http://localhost:8080/payments/count/{status}/windowed` | Contador de pagos por estado agrupado por ventanas de 1 minuto  |
 
 ### Scripts de la aplicación
 
-| Script                          | Descripción                                                  |
-|---------------------------------|--------------------------------------------------------------|
-| `scripts/05_send_payment.sh`    | Envía un pago de ejemplo (`amount: 1500` → alto valor)       |
-| `scripts/06_get_payment_count.sh [STATUS]` | Consulta el contador por estado (`APPROVED` por defecto) |
+| Script                                      | Descripción                                                  |
+|---------------------------------------------|--------------------------------------------------------------|
+| `scripts/05_send_payment.sh`                | Envía un pago de ejemplo (`amount: 1500` → alto valor)       |
+| `scripts/06_get_payment_count.sh [STATUS]`  | Consulta el contador total por estado (`APPROVED` por defecto) |
+| `scripts/07_get_windowed_count.sh [STATUS]` | Consulta el contador por ventanas temporales (`APPROVED` por defecto) |
 
 ### Ejemplos de uso
 
@@ -348,6 +353,28 @@ curl -s http://localhost:8080/payments/count/APPROVED | jq .
 ```
 
 Respuesta esperada: `2`
+
+1. Consultar el contador de pagos por ventanas temporales de 1 minuto:
+
+```bash
+./scripts/07_get_windowed_count.sh APPROVED
+```
+
+O directamente con curl:
+
+```bash
+curl -s http://localhost:8080/payments/count/APPROVED/windowed | jq .
+```
+
+Respuesta esperada (un objeto cuyas claves son los instantes de inicio de cada ventana):
+```json
+{
+  "2026-05-15T10:00:00Z": 3,
+  "2026-05-15T10:01:00Z": 1
+}
+```
+
+Cada clave es el timestamp ISO-8601 del inicio de la ventana de 1 minuto. El valor es el número de pagos con ese estado recibidos durante ese minuto. Se devuelven las ventanas de la última hora.
 
 ### Verificar en Kafka UI
 

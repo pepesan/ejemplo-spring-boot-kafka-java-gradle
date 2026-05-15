@@ -12,6 +12,7 @@ import org.apache.kafka.streams.kstream.Grouped;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.TimeWindows;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,7 @@ import org.springframework.kafka.annotation.EnableKafkaStreams;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 
 @Slf4j
 @Configuration
@@ -26,10 +28,12 @@ import java.math.BigDecimal;
 @ConditionalOnProperty(name = "spring.kafka.streams.application-id")
 public class PaymentStreamsTopology {
 
-    public static final String INPUT_TOPIC       = "payments";
-    public static final String HIGH_VALUE_TOPIC  = "payments-high-value";
-    public static final String COUNT_STORE       = "payment-count-by-status";
-    static final BigDecimal HIGH_VALUE_THRESHOLD = new BigDecimal("1000");
+    public static final String INPUT_TOPIC        = "payments";
+    public static final String HIGH_VALUE_TOPIC   = "payments-high-value";
+    public static final String COUNT_STORE        = "payment-count-by-status";
+    public static final String WINDOW_COUNT_STORE = "payment-count-by-status-window";
+    public static final Duration WINDOW_SIZE      = Duration.ofMinutes(1);
+    static final BigDecimal HIGH_VALUE_THRESHOLD  = new BigDecimal("1000");
 
     @Bean
     public KStream<String, PaymentEvent> paymentsStream(StreamsBuilder builder) {
@@ -50,6 +54,14 @@ public class PaymentStreamsTopology {
                         (key, payment) -> payment.getStatus(),
                         Grouped.with(Serdes.String(), serde))
                 .count(Materialized.as(COUNT_STORE));
+
+        // Rama 3: contador por ventana temporal (tumbling 1 min) → state store consultable via REST
+        payments
+                .groupBy(
+                        (key, payment) -> payment.getStatus(),
+                        Grouped.with(Serdes.String(), serde))
+                .windowedBy(TimeWindows.ofSizeWithNoGrace(WINDOW_SIZE))
+                .count(Materialized.as(WINDOW_COUNT_STORE));
 
         return payments;
     }
