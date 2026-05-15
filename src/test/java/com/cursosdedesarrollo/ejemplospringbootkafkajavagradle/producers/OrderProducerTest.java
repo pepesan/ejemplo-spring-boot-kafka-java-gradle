@@ -10,7 +10,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -43,7 +43,7 @@ class OrderProducerTest {
                                 .build()
                 ))
                 .total(new BigDecimal("999.98"))
-                .createdAt(LocalDateTime.of(2026, 5, 14, 19, 0))
+                .createdAt(Instant.parse("2026-05-14T19:00:00Z"))
                 .build();
 
         when(kafkaTemplate.send(eq("orders"), eq("ORD-001"), any()))

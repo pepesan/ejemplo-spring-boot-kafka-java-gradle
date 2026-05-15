@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Data
@@ -18,7 +18,7 @@ public class OrderMessage {
     private String customerId;
     private List<OrderLine> lines;
     private BigDecimal total;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Data
     @Builder

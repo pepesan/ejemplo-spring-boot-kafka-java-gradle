@@ -4,7 +4,7 @@ import com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.models.OrderMessa
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,7 +46,7 @@ class OrderConsumerTest {
                                 .build()
                 ))
                 .total(new BigDecimal("499.99"))
-                .createdAt(LocalDateTime.of(2026, 5, 14, 19, 0))
+                .createdAt(Instant.parse("2026-05-14T19:00:00Z"))
                 .build();
     }
 }

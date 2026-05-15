@@ -20,5 +20,5 @@ curl -X POST http://localhost:8080/orders \
       }
     ],
     "total": 1019.97,
-    "createdAt": "2026-05-14T19:00:00"
+    "createdAt": "2026-05-14T19:00:00Z"
   }'

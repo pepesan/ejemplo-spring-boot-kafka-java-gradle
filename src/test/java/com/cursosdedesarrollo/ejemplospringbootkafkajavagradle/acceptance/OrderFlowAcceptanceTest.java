@@ -14,7 +14,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,7 +56,7 @@ class OrderFlowAcceptanceTest {
                                 .build()
                 ))
                 .total(new BigDecimal("999.98"))
-                .createdAt(LocalDateTime.of(2026, 5, 14, 19, 0))
+                .createdAt(Instant.parse("2026-05-14T19:00:00Z"))
                 .build();
 
         // Enviar pedido via REST → llega al topic de Kafka
