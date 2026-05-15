@@ -2,12 +2,6 @@
 
 ## Arranque del servidor Kafka
 
-#### Creación automática de topics
-
-El broker tiene `KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"` en el `compose.yaml`. Al arrancar la aplicación, el `@KafkaListener` de `ProductConsumer` provoca que Kafka cree automáticamente el topic `products` con la configuración por defecto (1 partición, replication factor 1).
-
-Por eso el script `docker/04_create_topic.sh` usa `--if-not-exists`: evita el error `TopicExistsException` si el topic ya fue creado por la app.
-
 ### Scripts docker
 
 | Script                          | Descripción                                        |
@@ -22,12 +16,29 @@ Por eso el script `docker/04_create_topic.sh` usa `--if-not-exists`: evita el er
 | `10_describe_consumer_group.sh` | Describe el consumer group                         |
 | `20_destroy.sh`                 | Para y elimina el entorno Docker                   |
 
+### Arranque de los servicios
+
+```shell
+cd docker
+./01_launch.sh
+```
+
 ### URLs principales
 
 | Recurso                    | URL                    |
 |----------------------------|------------------------|
 | Kafka (solo applicaciones) | localhost:9092         |
 | Kafka UI                   | http://localhost:8081/ |
+
+### Creación automática de topics
+
+El broker tiene `KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"` en el `compose.yaml`. Al arrancar la aplicación, el `@KafkaListener` de `ProductConsumer` provoca que Kafka cree automáticamente el topic `products` con la configuración por defecto (1 partición, replication factor 1).
+
+Por eso el script `docker/04_create_topic.sh` usa `--if-not-exists`: evita el error `TopicExistsException` si el topic ya fue creado por la app.
+
+
+
+
 
 ## Arranque de la aplicación
 ```shell
@@ -117,7 +128,7 @@ Para ejecutar un método de test concreto:
 
 
 
-## Flujo completo productor → consumer
+## Flujo Products — productor → consumer
 
 1. Enviar un producto al topic:
 
@@ -163,6 +174,194 @@ Respuesta esperada:
 2. Selecciona el cluster `demo-cluster`
 3. Ve a **Topics** → `products`
 4. Haz clic en la pestaña **Messages** para ver los mensajes enviados
+
+## Flujo Orders — productor → consumer
+
+```
+POST /orders
+    → OrderProducer → topic: orders
+        → OrderConsumer (almacena en lista en memoria)
+            ↑
+    GET /orders/consumed
+```
+
+### Modelo `OrderMessage`
+
+| Campo        | Tipo                | Descripción                          |
+|--------------|---------------------|--------------------------------------|
+| `id`         | `String`            | Identificador del pedido             |
+| `customerId` | `String`            | Identificador del cliente            |
+| `lines`      | `List<OrderLine>`   | Líneas del pedido                    |
+| `total`      | `BigDecimal`        | Importe total del pedido             |
+| `createdAt`  | `LocalDateTime`     | Fecha y hora de creación             |
+
+Cada `OrderLine` contiene: `productId`, `productName`, `quantity`, `unitPrice`.
+
+### Endpoints REST
+
+| Método | URL                                    | Descripción                          |
+|--------|----------------------------------------|--------------------------------------|
+| POST   | `http://localhost:8080/orders`         | Envía un pedido al topic `orders`    |
+| GET    | `http://localhost:8080/orders/consumed` | Lista los pedidos consumidos         |
+
+### Scripts de la aplicación
+
+| Script                              | Descripción                              |
+|-------------------------------------|------------------------------------------|
+| `scripts/03_send_order.sh`          | Envía un pedido de ejemplo               |
+| `scripts/04_get_consumed_orders.sh` | Lista los pedidos recibidos por el consumer |
+
+### Ejemplos de uso
+
+1. Enviar un pedido:
+
+```bash
+./scripts/03_send_order.sh
+```
+
+O directamente con curl:
+
+```bash
+curl -s -X POST http://localhost:8080/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "ORD-001",
+    "customerId": "CUST-42",
+    "lines": [
+      { "productId": "1", "productName": "TV 4K",          "quantity": 2, "unitPrice": 499.99 },
+      { "productId": "2", "productName": "Mando Universal", "quantity": 1, "unitPrice": 19.99 }
+    ],
+    "total": 1019.97,
+    "createdAt": "2026-05-14T19:00:00"
+  }' | jq .
+```
+
+Respuesta esperada (HTTP 202 Accepted):
+```json
+{
+  "id": "ORD-001",
+  "customerId": "CUST-42",
+  "lines": [
+    { "productId": "1", "productName": "TV 4K",           "quantity": 2, "unitPrice": 499.99 },
+    { "productId": "2", "productName": "Mando Universal",  "quantity": 1, "unitPrice": 19.99 }
+  ],
+  "total": 1019.97,
+  "createdAt": "2026-05-14T19:00:00"
+}
+```
+
+1. Consultar los pedidos consumidos:
+
+```bash
+./scripts/04_get_consumed_orders.sh
+```
+
+O directamente con curl:
+
+```bash
+curl -s http://localhost:8080/orders/consumed | jq .
+```
+
+> Los mensajes se almacenan en memoria. Al reiniciar la aplicación la lista se vacía, pero los mensajes siguen disponibles en el topic de Kafka.
+
+### Verificar mensajes con Kafka UI
+
+1. Abre http://localhost:8081/
+2. Selecciona el cluster `demo-cluster`
+3. Ve a **Topics** → `orders`
+4. Haz clic en la pestaña **Messages** para ver los pedidos enviados
+
+---
+
+## Kafka Streams — Flujo de pagos
+
+La topología de Kafka Streams procesa los mensajes del topic `payments` en tiempo real y realiza dos operaciones en paralelo:
+
+```
+POST /payments
+    → PaymentProducer → topic: payments
+        → PaymentStreamsTopology (Kafka Streams)
+            ├─ amount > 1000 → topic: payments-high-value
+            └─ agrupa por status → state store: payment-count-by-status
+                                        ↑
+                             GET /payments/count/{status}
+```
+
+### Modelo `PaymentEvent`
+
+| Campo      | Tipo         | Descripción                            |
+|------------|--------------|----------------------------------------|
+| `id`       | `String`     | Identificador del pago                 |
+| `orderId`  | `String`     | Identificador del pedido asociado      |
+| `amount`   | `BigDecimal` | Importe del pago                       |
+| `currency` | `String`     | Divisa (p.ej. `EUR`)                   |
+| `status`   | `String`     | Estado: `PENDING`, `APPROVED`, `REJECTED` |
+
+### Endpoints REST
+
+| Método | URL                                          | Descripción                                            |
+|--------|----------------------------------------------|--------------------------------------------------------|
+| POST   | `http://localhost:8080/payments`             | Envía un pago al topic `payments`                      |
+| GET    | `http://localhost:8080/payments/count/{status}` | Consulta el contador de pagos por estado en el state store |
+
+### Scripts de la aplicación
+
+| Script                          | Descripción                                                  |
+|---------------------------------|--------------------------------------------------------------|
+| `scripts/05_send_payment.sh`    | Envía un pago de ejemplo (`amount: 1500` → alto valor)       |
+| `scripts/06_get_payment_count.sh [STATUS]` | Consulta el contador por estado (`APPROVED` por defecto) |
+
+### Ejemplos de uso
+
+1. Enviar un pago (amount > 1000, se enruta también a `payments-high-value`):
+
+```bash
+./scripts/05_send_payment.sh
+```
+
+O directamente con curl:
+
+```bash
+curl -s -X POST http://localhost:8080/payments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "PAY-001",
+    "orderId": "ORD-001",
+    "amount": 1500.00,
+    "currency": "EUR",
+    "status": "APPROVED"
+  }' | jq .
+```
+
+1. Consultar cuántos pagos hay con un estado concreto:
+
+```bash
+./scripts/06_get_payment_count.sh APPROVED
+./scripts/06_get_payment_count.sh PENDING
+./scripts/06_get_payment_count.sh REJECTED
+```
+
+O directamente con curl:
+
+```bash
+curl -s http://localhost:8080/payments/count/APPROVED | jq .
+```
+
+Respuesta esperada: `2`
+
+### Verificar en Kafka UI
+
+1. Abre http://localhost:8081/
+2. Ve a **Topics** → `payments` para ver todos los pagos
+3. Ve a **Topics** → `payments-high-value` para ver solo los pagos con `amount > 1000`
+
+### Detalles de implementación
+
+- La topología se activa solo si `spring.kafka.streams.application-id` está definido en `application.yaml`. Esto evita que se cargue en los tests slice (`@WebFluxTest`) donde no hay Kafka.
+- El Serde usa Jackson nativo (`tools.jackson`) en lugar de `JsonSerde` de Spring Kafka, por incompatibilidad de las clases de Spring Kafka con el compilador Java 25.
+- El state store `payment-count-by-status` es una tabla en memoria mantenida automáticamente por Kafka Streams y consultable vía REST.
+
+---
 
 ## Reference Documentation
 

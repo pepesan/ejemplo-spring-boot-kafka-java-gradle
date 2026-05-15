@@ -26,6 +26,7 @@ class ProductProducerTest {
     @InjectMocks
     private ProductProducer productProducer;
 
+    @SuppressWarnings("unchecked")
     @Test
     void send_delegatesToKafkaTemplate() {
         ProductMessage product = ProductMessage.builder()

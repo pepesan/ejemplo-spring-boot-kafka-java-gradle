@@ -27,6 +27,7 @@ class PaymentProducerTest {
     @InjectMocks
     private PaymentProducer paymentProducer;
 
+    @SuppressWarnings("unchecked")
     @Test
     void send_delegatesToKafkaTemplate() {
         PaymentEvent payment = PaymentEvent.builder()

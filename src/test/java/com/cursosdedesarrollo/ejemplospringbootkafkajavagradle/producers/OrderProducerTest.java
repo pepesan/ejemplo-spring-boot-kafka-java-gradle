@@ -28,6 +28,7 @@ class OrderProducerTest {
     @InjectMocks
     private OrderProducer orderProducer;
 
+    @SuppressWarnings("unchecked")
     @Test
     void send_delegatesToKafkaTemplate() {
         OrderMessage order = OrderMessage.builder()
