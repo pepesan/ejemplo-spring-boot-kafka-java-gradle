@@ -18,7 +18,7 @@ import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.kafka.streams.state-dir=/tmp/kafka-streams-product-test")
 @EmbeddedKafka(partitions = 1, topics = {"products"})
 @DirtiesContext
 @Import(KafkaTestConfig.class)

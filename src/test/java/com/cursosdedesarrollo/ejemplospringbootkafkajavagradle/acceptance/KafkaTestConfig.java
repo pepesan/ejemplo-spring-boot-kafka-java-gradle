@@ -26,6 +26,7 @@ class KafkaTestConfig {
     @Value("${spring.application.name}")
     private String groupId;
 
+    @SuppressWarnings("unchecked")
     @Bean
     @Primary
     public ProducerFactory<String, Object> testProducerFactory() {
@@ -41,6 +42,7 @@ class KafkaTestConfig {
         return new KafkaTemplate<>(testProducerFactory);
     }
 
+    @SuppressWarnings("unchecked")
     @Bean
     @Primary
     public ConsumerFactory<String, Object> testConsumerFactory() {

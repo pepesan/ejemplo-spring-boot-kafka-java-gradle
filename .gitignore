@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+## Quitar cosas de Claude
+.claude
+CLAUDE.md

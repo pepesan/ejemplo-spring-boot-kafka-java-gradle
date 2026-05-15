@@ -1,6 +1,6 @@
 package com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.producers;
 
-import com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.models.ProductMessage;
+import com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.models.PaymentEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,37 +14,35 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ProductProducerTest {
+class PaymentProducerTest {
 
     @Mock
     private KafkaTemplate<String, Object> kafkaTemplate;
 
     @InjectMocks
-    private ProductProducer productProducer;
+    private PaymentProducer paymentProducer;
 
     @SuppressWarnings("unchecked")
     @Test
     void send_delegatesToKafkaTemplate() {
-        ProductMessage product = ProductMessage.builder()
-                .id("1")
-                .name("TV 4K")
-                .price(new BigDecimal("499.99"))
-                .stock(10)
+        PaymentEvent payment = PaymentEvent.builder()
+                .id("PAY-001")
+                .orderId("ORD-001")
+                .amount(new BigDecimal("1500.00"))
+                .currency("EUR")
+                .status("APPROVED")
                 .build();
 
-        when(kafkaTemplate.send(eq("products"), eq("1"), any()))
+        when(kafkaTemplate.send(eq("payments"), eq("PAY-001"), any()))
                 .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
 
-        productProducer.send(product);
+        paymentProducer.send(payment);
 
-        verify(kafkaTemplate).send("products", "1", product);
-    }
-
-    private <T> T mock(Class<T> clazz) {
-        return org.mockito.Mockito.mock(clazz);
+        verify(kafkaTemplate).send("payments", "PAY-001", payment);
     }
 }
