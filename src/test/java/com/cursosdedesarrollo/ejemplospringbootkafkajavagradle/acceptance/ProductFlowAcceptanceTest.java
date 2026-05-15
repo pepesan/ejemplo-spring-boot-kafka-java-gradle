@@ -37,7 +37,7 @@ class ProductFlowAcceptanceTest {
         webTestClient = WebTestClient.bindToServer()
                 .baseUrl("http://localhost:" + port)
                 .build();
-        productConsumer.getReceivedProducts().clear();
+        productConsumer.clearAll();
     }
 
     @Test

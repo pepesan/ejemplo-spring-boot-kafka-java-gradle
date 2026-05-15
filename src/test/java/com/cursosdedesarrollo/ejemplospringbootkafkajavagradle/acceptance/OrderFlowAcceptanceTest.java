@@ -39,7 +39,7 @@ class OrderFlowAcceptanceTest {
         webTestClient = WebTestClient.bindToServer()
                 .baseUrl("http://localhost:" + port)
                 .build();
-        orderConsumer.getReceivedOrders().clear();
+        orderConsumer.clearAll();
     }
 
     @Test

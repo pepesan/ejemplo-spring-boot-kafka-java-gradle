@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @WebFluxTest(OrderController.class)
 class OrderControllerTest {
@@ -57,6 +58,49 @@ class OrderControllerTest {
                 .expectBodyList(OrderMessage.class)
                 .hasSize(1)
                 .contains(order);
+    }
+
+    @Test
+    void sendOrder_withBlankCustomerId_returns400() {
+        OrderMessage order = OrderMessage.builder()
+                .id("ORD-001")
+                .customerId("")
+                .lines(List.of(
+                        OrderMessage.OrderLine.builder()
+                                .productId("1").productName("TV 4K")
+                                .quantity(1).unitPrice(new BigDecimal("499.99"))
+                                .build()
+                ))
+                .total(new BigDecimal("499.99"))
+                .createdAt(Instant.parse("2026-05-14T19:00:00Z"))
+                .build();
+
+        webTestClient.post()
+                .uri("/orders")
+                .bodyValue(order)
+                .exchange()
+                .expectStatus().isBadRequest();
+
+        verifyNoInteractions(orderProducer);
+    }
+
+    @Test
+    void sendOrder_withEmptyLines_returns400() {
+        OrderMessage order = OrderMessage.builder()
+                .id("ORD-001")
+                .customerId("CUST-42")
+                .lines(List.of())
+                .total(new BigDecimal("499.99"))
+                .createdAt(Instant.parse("2026-05-14T19:00:00Z"))
+                .build();
+
+        webTestClient.post()
+                .uri("/orders")
+                .bodyValue(order)
+                .exchange()
+                .expectStatus().isBadRequest();
+
+        verifyNoInteractions(orderProducer);
     }
 
     private OrderMessage buildOrder() {

@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @WebFluxTest(ProductController.class)
 class ProductControllerTest {
@@ -44,5 +45,41 @@ class ProductControllerTest {
                 .isEqualTo(product);
 
         verify(productProducer).send(product);
+    }
+
+    @Test
+    void sendProduct_withBlankId_returns400() {
+        ProductMessage product = ProductMessage.builder()
+                .id("")
+                .name("TV 4K")
+                .price(new BigDecimal("499.99"))
+                .stock(10)
+                .build();
+
+        webTestClient.post()
+                .uri("/products")
+                .bodyValue(product)
+                .exchange()
+                .expectStatus().isBadRequest();
+
+        verifyNoInteractions(productProducer);
+    }
+
+    @Test
+    void sendProduct_withNullPrice_returns400() {
+        ProductMessage product = ProductMessage.builder()
+                .id("1")
+                .name("TV 4K")
+                .price(null)
+                .stock(10)
+                .build();
+
+        webTestClient.post()
+                .uri("/products")
+                .bodyValue(product)
+                .exchange()
+                .expectStatus().isBadRequest();
+
+        verifyNoInteractions(productProducer);
     }
 }

@@ -45,6 +45,28 @@ spring:
       # Paquetes de confianza para la deserialización JSON. Evita que se deserialicen clases arbitrarias
       spring.json.trusted.packages: "com.cursosdedesarrollo.ejemplospringbootkafkajavagradle.models"
 
+# ─── BASE DE DATOS ────────────────────────────────────────────────────────────
+  datasource:
+    # H2 en memoria: los datos se pierden al reiniciar la aplicación.
+    # Para persistencia en fichero usa: jdbc:h2:file:./data/kafka-events
+    url: jdbc:h2:mem:kafkadb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop    # crea el esquema al arrancar y lo borra al parar
+    show-sql: false            # cambiar a true para ver las queries SQL en log
+    database-platform: org.hibernate.dialect.H2Dialect
+
+  h2:
+    console:
+      # Consola web de H2 disponible en http://localhost:8080/h2-console
+      # JDBC URL: jdbc:h2:mem:kafkadb
+      enabled: true
+      path: /h2-console
+
 # ─── ACTUATOR ─────────────────────────────────────────────────────────────────
 management:
   endpoints:

@@ -152,7 +152,7 @@ Respuesta esperada:
 [{"id":"1","name":"TV 4K","description":"Televisor 55 pulgadas","price":499.99,"stock":10}]
 ```
 
-> Los mensajes se almacenan en memoria. Al reiniciar la aplicación la lista se vacía, pero los mensajes siguen disponibles en el topic de Kafka.
+> Los mensajes se persisten en la base de datos H2 en memoria. Al reiniciar la aplicación la base de datos se vacía, pero los mensajes siguen disponibles en el topic de Kafka.
 
 ### Scripts de la aplicación
 
@@ -180,7 +180,7 @@ Respuesta esperada:
 ```
 POST /orders
     → OrderProducer → topic: orders
-        → OrderConsumer (almacena en lista en memoria)
+        → OrderConsumer (persiste en H2 vía JPA)
             ↑
     GET /orders/consumed
 ```
@@ -262,7 +262,7 @@ O directamente con curl:
 curl -s http://localhost:8080/orders/consumed | jq .
 ```
 
-> Los mensajes se almacenan en memoria. Al reiniciar la aplicación la lista se vacía, pero los mensajes siguen disponibles en el topic de Kafka.
+> Los mensajes se persisten en la base de datos H2 en memoria. Al reiniciar la aplicación la base de datos se vacía, pero los mensajes siguen disponibles en el topic de Kafka.
 
 ### Verificar mensajes con Kafka UI
 
@@ -387,6 +387,125 @@ Cada clave es el timestamp ISO-8601 del inicio de la ventana de 1 minuto. El val
 - La topología se activa solo si `spring.kafka.streams.application-id` está definido en `application.yaml`. Esto evita que se cargue en los tests slice (`@WebFluxTest`) donde no hay Kafka.
 - El Serde usa Jackson nativo (`tools.jackson`) en lugar de `JsonSerde` de Spring Kafka, por incompatibilidad de las clases de Spring Kafka con el compilador Java 25.
 - El state store `payment-count-by-status` es una tabla en memoria mantenida automáticamente por Kafka Streams y consultable vía REST.
+
+---
+
+## Kafka Streams — Join orders + payments
+
+La topología de join combina en tiempo real los pedidos con sus pagos, produciendo un evento enriquecido en el topic `orders-payments`.
+
+```
+POST /orders  →  topic: orders  ──────────────────────────────────┐
+                                                                   ▼
+POST /payments → topic: payments → (re-key por orderId) → KStream-KTable JOIN
+                                                                   │
+                                                  topic: orders-payments
+                                                                   │
+                                                   OrderPaymentConsumer (en memoria)
+                                                                   ↑
+                                             GET /orders-payments/consumed
+```
+
+**Tipo de join:** KStream-KTable. Por cada pago que llega, se busca el pedido correspondiente en la KTable (indexada por `orderId`). Si no existe el pedido, el pago se descarta silenciosamente.
+
+**Requisito:** el pedido debe publicarse en `orders` **antes** de que llegue el pago con ese `orderId`.
+
+### Modelo `OrderPaymentEvent`
+
+| Campo             | Tipo         | Descripción                               |
+|-------------------|--------------|-------------------------------------------|
+| `orderId`         | `String`     | ID del pedido                             |
+| `customerId`      | `String`     | Cliente del pedido                        |
+| `orderTotal`      | `BigDecimal` | Importe total del pedido                  |
+| `paymentId`       | `String`     | ID del pago                               |
+| `paymentAmount`   | `BigDecimal` | Importe del pago                          |
+| `paymentCurrency` | `String`     | Divisa del pago                           |
+| `paymentStatus`   | `String`     | Estado: `PENDING`, `APPROVED`, `REJECTED` |
+
+### Endpoints REST
+
+| Método | URL                                             | Descripción                               |
+|--------|-------------------------------------------------|-------------------------------------------|
+| GET    | `http://localhost:8080/orders-payments/consumed` | Lista los eventos join persistidos en H2 |
+
+### Scripts de la aplicación
+
+| Script                                  | Descripción                                    |
+|-----------------------------------------|------------------------------------------------|
+| `scripts/08_get_joined_orders_payments.sh` | Lista los eventos join persistidos en H2 |
+
+### Ejemplo de uso
+
+1. Enviar un pedido (quedará en la KTable de orders):
+
+```bash
+./scripts/03_send_order.sh
+```
+
+2. Enviar un pago con el mismo `orderId` (`ORD-001`):
+
+```bash
+./scripts/05_send_payment.sh
+```
+
+3. Consultar los eventos join producidos:
+
+```bash
+./scripts/08_get_joined_orders_payments.sh
+```
+
+Respuesta esperada:
+```json
+[
+  {
+    "orderId": "ORD-001",
+    "customerId": "CUST-42",
+    "orderTotal": 1019.97,
+    "paymentId": "PAY-001",
+    "paymentAmount": 1500.00,
+    "paymentCurrency": "EUR",
+    "paymentStatus": "APPROVED"
+  }
+]
+```
+
+> Si el pedido no existía en el topic `orders` cuando llegó el pago, el join no produce resultado (el pago se descarta). Reenvía el pedido y vuelve a intentarlo.
+
+---
+
+## Persistencia con H2
+
+Los consumers de Kafka persisten los mensajes recibidos en una base de datos H2 embebida en memoria usando Spring Data JPA.
+
+### Tablas creadas automáticamente
+
+| Tabla               | Entidad              | Descripción                          |
+|---------------------|----------------------|--------------------------------------|
+| `product_message`   | `ProductMessage`     | Productos recibidos del topic        |
+| `order_messages`    | `OrderMessage`       | Pedidos recibidos del topic          |
+| `order_lines`       | `OrderLine`          | Líneas de cada pedido (colección)    |
+| `order_payment_event` | `OrderPaymentEvent` | Eventos join orders-payments        |
+
+### Consola H2
+
+Disponible en http://localhost:8080/h2-console mientras la aplicación está en ejecución.
+
+- **JDBC URL**: `jdbc:h2:mem:kafkadb`
+- **Usuario**: `sa`
+- **Contraseña**: *(vacía)*
+
+### Persistencia en fichero
+
+Para conservar los datos entre reinicios, cambia en `application.yaml`:
+
+```yaml
+spring:
+  datasource:
+    # url: jdbc:h2:mem:kafkadb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE  # en memoria
+    url: jdbc:h2:file:./data/kafka-events  # en fichero (crea ./data/kafka-events.mv.db)
+```
+
+> Los datos se pierden igualmente si cambias `ddl-auto: create-drop` (por defecto) a `update` cuando uses el modo fichero.
 
 ---
 

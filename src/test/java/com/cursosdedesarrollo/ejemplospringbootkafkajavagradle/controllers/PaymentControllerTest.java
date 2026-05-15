@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @WebFluxTest(PaymentController.class)
 class PaymentControllerTest {
@@ -37,6 +38,44 @@ class PaymentControllerTest {
                 .isEqualTo(payment);
 
         verify(paymentProducer).send(payment);
+    }
+
+    @Test
+    void sendPayment_withNullAmount_returns400() {
+        PaymentEvent payment = PaymentEvent.builder()
+                .id("PAY-001")
+                .orderId("ORD-001")
+                .amount(null)
+                .currency("EUR")
+                .status("APPROVED")
+                .build();
+
+        webTestClient.post()
+                .uri("/payments")
+                .bodyValue(payment)
+                .exchange()
+                .expectStatus().isBadRequest();
+
+        verifyNoInteractions(paymentProducer);
+    }
+
+    @Test
+    void sendPayment_withInvalidStatus_returns400() {
+        PaymentEvent payment = PaymentEvent.builder()
+                .id("PAY-001")
+                .orderId("ORD-001")
+                .amount(new BigDecimal("100.00"))
+                .currency("EUR")
+                .status("DESCONOCIDO")
+                .build();
+
+        webTestClient.post()
+                .uri("/payments")
+                .bodyValue(payment)
+                .exchange()
+                .expectStatus().isBadRequest();
+
+        verifyNoInteractions(paymentProducer);
     }
 
     private PaymentEvent buildPayment() {
