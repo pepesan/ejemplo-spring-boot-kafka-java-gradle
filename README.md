@@ -122,6 +122,35 @@ Para ejecutar un método de test concreto:
 | `controllers`            | Unitario    | Verifica los endpoints REST con `@WebFluxTest` y mocks   |
 | `acceptance`             | Aceptación  | Flujo completo con Kafka embebido vía `@EmbeddedKafka`   |
 
+### Informes de tests
+
+Tras cada ejecución de `./gradlew test` se generan automáticamente tres formatos de informe:
+
+| Formato | Ruta                                          | Descripción                                         |
+|---------|-----------------------------------------------|-----------------------------------------------------|
+| HTML    | `build/reports/tests/test/index.html`         | Informe visual navegable en el navegador            |
+| XML     | `build/test-results/test/TEST-*.xml`          | Formato JUnit estándar, compatible con CI/CD        |
+
+
+### Ver el informe HTML en el navegador
+
+```bash
+./gradlew serveTestReport
+```
+
+Arranca un servidor HTTP en `http://localhost:8888` que sirve el informe HTML, abre el navegador automáticamente y espera hasta que se pulse `Ctrl+C`.
+
+Si no existe un informe previo, la tarea avisa con un error:
+```
+No hay informe de tests. Ejecuta './gradlew test' primero.
+```
+
+Flujo habitual:
+```bash
+./gradlew test          # ejecuta los tests y genera los tres informes
+./gradlew serveTestReport  # sirve el informe HTML en http://localhost:8888
+```
+
 ---
 
 
