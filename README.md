@@ -473,6 +473,150 @@ Respuesta esperada:
 
 ---
 
+## Notifications — consumo por partición explícita
+
+Este ejemplo muestra cómo fijar un consumer a una partición concreta del topic usando `@KafkaListener` con `topicPartitions` y `@PartitionOffset`.
+
+```
+POST /notifications
+    → NotificationProducer → topic: notifications (2 particiones)
+        ├─ partición 0 → NotificationConsumerPartition0 (lista en memoria)
+        │                        ↑
+        │          GET /notifications/consumed/partition/0
+        └─ partición 1 → NotificationConsumerPartition1 (lista en memoria)
+                                 ↑
+                   GET /notifications/consumed/partition/1
+```
+
+### Cómo Kafka decide la partición
+
+Kafka usa el algoritmo **murmur2** sobre los bytes de la key para asignar la partición:
+
+```
+partición = murmur2(key) % numParticiones
+```
+
+El resultado es **determinista**: la misma key siempre va a la misma partición, independientemente de cuántas veces se envíe. Esto es lo que permite que un consumer fijo a una partición procese de forma consistente todos los mensajes de un mismo "grupo lógico" (p.ej. todos los eventos de un mismo usuario).
+
+La partición usada aparece en el log de la aplicación nada más enviar:
+```
+[PRODUCER] Mensaje enviado correctamente | topic=notifications | partition=0 | offset=3
+```
+
+Para este topic de 2 particiones, algunos ejemplos de cómo quedan distribuidas las keys:
+
+| Key        | Partición |
+|------------|-----------|
+| `NOTIF-001` | 0        |
+| `NOTIF-002` | 0        |
+| `NOTIF-003` | 0        |
+| `NOTIF-004` | **1**    |
+| `NOTIF-005` | **1**    |
+| `NOTIF-006` | 0        |
+| `NOTIF-007` | **1**    |
+
+### Modelo `NotificationMessage`
+
+| Campo       | Tipo      | Descripción                          |
+|-------------|-----------|--------------------------------------|
+| `id`        | `String`  | Identificador de la notificación     |
+| `recipient` | `String`  | Destinatario (p.ej. email)           |
+| `subject`   | `String`  | Asunto                               |
+| `body`      | `String`  | Cuerpo del mensaje                   |
+| `createdAt` | `Instant` | Fecha y hora de creación             |
+
+### Endpoints REST
+
+| Método | URL                                                        | Descripción                                       |
+|--------|------------------------------------------------------------|---------------------------------------------------|
+| POST   | `http://localhost:8080/notifications`                      | Envía una notificación al topic                   |
+| GET    | `http://localhost:8080/notifications/consumed/partition/0` | Mensajes recibidos por el consumer de partición 0 |
+| GET    | `http://localhost:8080/notifications/consumed/partition/1` | Mensajes recibidos por el consumer de partición 1 |
+
+### Ejemplos de uso
+
+**Paso 1** — Enviar una notificación a la **partición 0** (key `NOTIF-001`):
+
+```bash
+curl -s -X POST http://localhost:8080/notifications \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "NOTIF-001",
+    "recipient": "alice@example.com",
+    "subject": "Bienvenida",
+    "body": "Tu cuenta ha sido creada correctamente.",
+    "createdAt": "2026-05-20T10:00:00Z"
+  }' | jq .
+```
+
+**Paso 2** — Enviar una notificación a la **partición 1** (key `NOTIF-004`):
+
+```bash
+curl -s -X POST http://localhost:8080/notifications \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "NOTIF-004",
+    "recipient": "bob@example.com",
+    "subject": "Nuevo pedido",
+    "body": "Tu pedido ORD-001 ha sido confirmado.",
+    "createdAt": "2026-05-20T10:01:00Z"
+  }' | jq .
+```
+
+Tras enviar ambos mensajes, el log de la aplicación mostrará en qué partición acabó cada uno:
+```
+[PRODUCER] Mensaje enviado correctamente | topic=notifications | partition=0 | offset=0
+[PRODUCER] Mensaje enviado correctamente | topic=notifications | partition=1 | offset=0
+```
+
+**Paso 3** — Consultar la partición 0 (solo verá `NOTIF-001`):
+
+```bash
+curl -s http://localhost:8080/notifications/consumed/partition/0 | jq .
+```
+
+Respuesta esperada:
+```json
+[
+  {
+    "id": "NOTIF-001",
+    "recipient": "alice@example.com",
+    "subject": "Bienvenida",
+    "body": "Tu cuenta ha sido creada correctamente.",
+    "createdAt": "2026-05-20T10:00:00Z"
+  }
+]
+```
+
+**Paso 4** — Consultar la partición 1 (solo verá `NOTIF-004`):
+
+```bash
+curl -s http://localhost:8080/notifications/consumed/partition/1 | jq .
+```
+
+Respuesta esperada:
+```json
+[
+  {
+    "id": "NOTIF-004",
+    "recipient": "bob@example.com",
+    "subject": "Nuevo pedido",
+    "body": "Tu pedido ORD-001 ha sido confirmado.",
+    "createdAt": "2026-05-20T10:01:00Z"
+  }
+]
+```
+
+> **`initialOffset = "0"`**: los consumers de notificaciones siempre releen desde el principio del topic al arrancar. Esto es útil en demos para no perder mensajes enviados antes de que el consumer estuviera activo. En producción se omitiría este parámetro para continuar desde el último offset procesado.
+
+### Verificar en Kafka UI
+
+1. Abre http://localhost:8081/
+2. Ve a **Topics** → `notifications` → pestaña **Messages**: puedes filtrar por partición (0 o 1) y ver exactamente qué mensaje fue a cada una
+3. Ve a **Consumer Groups**: verás dos grupos independientes, `...-notifications-p0` y `...-notifications-p1`, cada uno asignado exclusivamente a su partición
+
+---
+
 ## Persistencia con H2
 
 Los consumers de Kafka persisten los mensajes recibidos en una base de datos H2 embebida en memoria usando Spring Data JPA.

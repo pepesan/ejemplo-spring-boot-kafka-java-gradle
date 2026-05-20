@@ -34,4 +34,9 @@ public class KafkaTopicsConfig {
     public NewTopic ordersPaymentsTopic() {
         return TopicBuilder.name(OrderPaymentJoinTopology.OUTPUT_TOPIC).partitions(1).replicas(1).build();
     }
+
+    @Bean
+    public NewTopic notificationsTopic() {
+        return TopicBuilder.name("notifications").partitions(2).replicas(1).build();
+    }
 }
